@@ -1,16 +1,72 @@
 # efcore6-learn
 Entity Framework (EF) Core 6 の謎
 
+## 前提条件
+使用するテーブルは以下の通り
+
+ - テーブル　Information
+
+| 物理名 | タイプ | NOT NULL | 備考 |
+|--|--|--|--|
+|id|num|YES|プライマリキー|
+|title|text|NO|タイトル|
+|message|text|NO|内容|
+
+
+## 基礎知識
+
+EF Coreにおける基本的なデータベース操作命令は以下の通り  
+
+- 追加
+
+```csharp
+DBContext context = GetDbContext();
+try {
+    Information info1 = new() { id = 1, title = "タイトル", message = "内容" };
+    context.Informations.Add(info1);
+    context.SaveChanges();
+} catch (Exception e){
+   throw e;
+}
+return OK;
+```
+
+
+- 更新
+
+```csharp
+DBContext context = GetDbContext();
+try {
+    Information info = context.Informations.Find(1);
+    info.Title = "タイトル(更新後)";
+    context.Informations.Update(info);
+    context.SaveChanges();
+} catch (Exception e){
+   throw e;
+}
+return OK;
+```
+
+
+- 削除
+
+```csharp
+DBContext context = GetDbContext();
+try {
+    Information info = context.Informations.Find(1);
+    context.Informations.Remove(info);
+    context.SaveChanges();
+} catch (Exception e){
+   throw e;
+}
+return OK;
+```
+
+
+
+
+
 ## 問題
-
-テーブル　Information
-
-| 物理名 | タイプ| 備考 |
-|--|--|--|
-|id|num|プライマリキー(not null)|
-|title|text|タイトル(null許可)|
-|message|text|内容(null許可)|
-
 
 ### No.1 Entityを追加する
 以下のコードを実行した結果、どうなるでしょうか？
@@ -29,6 +85,40 @@ try {
 }
 return OK;
 ```
+
+
+正常終了：データが追加される  
+データベースに追加するメソッドAddで追加しているので、データベースにも反映されるはず！  
+
+|id|title|message|
+|-|-|-|
+|101|タイトル||
+
+
+正常終了：データが追加されない  
+Saveしていないので、保存していない編集中の内容はすべて破棄され、反映されないはず！  
+
+|id|title|message|
+|-|-|-|
+
+
+エラー：データが追加されない①  
+テーブルの項目をすべて設定していないので、エラーになるはず！  
+
+|id|title|message|
+|-|-|-|
+
+
+エラー：データが追加されない
+保存していないので、編集中の内容があるため警告をだしてくれるはず！  
+
+|id|title|message|
+|-|-|-|
+
+
+
+
+
 
 1. システムエラー：データ変更なし  
   追加要求しているのに、保存メソッドを呼んでいないので、エラーになるはず！  
@@ -212,14 +302,14 @@ return OK;
 |-|-|-|
 |101|タイトル||
 
-2. システムエラー：データ変更あり  
+2. システムエラー：データ更新あり  
   Updateまでの操作は自動コミットにより反映され、titleの変数操作が追跡管理外になるのでエラーになるはず！  
 
 |id|title|message|
 |-|-|-|
 |101|更新後||
 
-3. 正常終了：データ変更あり  
+3. 正常終了：データ更新あり  
   Update呼び出し直前までが反映される。  
   その後の操作はUpdateメソッドを呼び出していないので、データベースには反映されないはず！  
 
@@ -227,8 +317,8 @@ return OK;
 |-|-|-|
 |101|更新後||
 
-4. 正常終了：データ追加・更新あり  
-  EF Coreがうまいことやってくれるので、タイトルも更新されるはず！  
+4. 正常終了：データ更新×２あり  
+  EF Coreがうまいことやってくれるので、最後のタイトルも更新されるはず！  
 
 |id|title|message|
 |-|-|-|
@@ -238,7 +328,7 @@ return OK;
 <details>
 <summary>こたえ</summary>
 
-4. 正常終了：データ追加・更新あり  
+4. 正常終了：データ更新×２あり 
  
 > Update命令で管理下になり、Entityは変更追跡され、最終的な結果が永続化される。
 </details>
@@ -391,60 +481,34 @@ try {
 return OK;
 ```
 
-1. 正常終了：データ追加・更新あり  
-   ソースに書いた通り、AddしてUpdateされるはず！  
-   
-|id|title|message|
-|-|-|-|
-|101|EF Core の謎||
-
-2. システムエラー：データ変更なし
-
-
-
-
-
-
-
-
 
 1. システムエラー：データ変更なし  
-  Updateの時点でデータがデータベースにないので、エラーになるはず！  
+  データを追加を依頼した後に、データの更新を行おうとしているので（２つの異なる操作）、エラーになるはず！  
 
 |id|title|message|
 |-|-|-|
 
-2. システムエラー：データ追加あり   
-  Addは成功して自動コミットされ、Update命令が先に実行されているため、エラーにしてくれるはず！ 
+2. システムエラー：データ追加あり  
+  データの追加は成功し自動コミットされるが、データの更新操作を行おうとして、エラーになるはず！  
 
 |id|title|message|
 |-|-|-|
+|101|タイトル||
 
-3. システムエラー：データ追加あり  
-  Update命令は空振りし、Addが実行されるはず！  
+3. 正常終了：データ変更なし   
+  データの追加は成功し自動コミットされる。
+  タイトルの更新はUpdateメソッドを呼び出していないので、データベースには反映されないはず！  
 
 |id|title|message|
 |-|-|-|
 |101|タイトル||
 
 4. 正常終了：データ追加・更新あり  
-  Update命令は空振りし、Addが実行され、さらに title も更新されるはず！  
+  EF Coreがうまいことやってくれるので、データを追加したあとで更新してくれるはず！  
 
 |id|title|message|
 |-|-|-|
 |101|EF Core の謎||
-
-
-<details>
-<summary>こたえ</summary>
-
-4. 正常終了：データ追加・更新あり  
- 
-> 一番最初のUpdateはなかったことにされる。
-</details>
-
-
-
 
 
 
