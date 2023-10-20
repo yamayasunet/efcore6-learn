@@ -676,3 +676,268 @@ return OK;
 </details>
 
 ---
+
+### No.11 データ追加後に検索して更新
+
+以下のコードを実行した結果、どうなるでしょうか？
+
+> [!NOTE]
+>
+> - データベース内にはデータが存在しない
+> - 任意でトランザクション開始しない(お任せ自動コミットモード)
+
+```csharp
+DBContext context = GetDbContext();
+try {
+   var info = new Information { id = 1, title = "本日は" , message = "晴天なり"};
+   context.Informations.Add(info);
+   // -- (中略) --
+   var infoT = context.Informations.Find(1);
+   infoT.title = "明日は";
+   context.SaveChanges();
+} catch (Exception e) {
+   throw e;
+}
+return OK;
+```
+
+1. 正常終了：データ追加
+   データが追加されるが、更新はされない。
+
+| id  | title  | message  |
+| --- | ------ | -------- |
+| 1   | 本日は | 晴天なり |
+
+2. 正常終了：データ追加・更新  
+   データが追加されたのち、message が更新される。
+
+| id  | title  | message  |
+| --- | ------ | -------- |
+| 1   | 明日は | 晴天なり |
+
+3. エラー：処理に失敗  
+   連続操作しようとすると Update 処理がうまくできず、エラーになってしまう。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+<details>
+<summary>こたえ</summary>
+
+2. 正常終了：データ追加・更新
+
+> 追加して、更新される。
+
+</details>
+
+---
+
+### No.12 データ追加後に更新(Select しない Update)
+
+以下のコードを実行した結果、どうなるでしょうか？
+
+> [!NOTE]
+>
+> - データベース内にはデータが存在しない
+> - 任意でトランザクション開始しない(お任せ自動コミットモード)
+
+```csharp
+DBContext context = GetDbContext();
+try {
+   var info = new Information { id = 1, title = "本日は" , message = "晴天なり"};
+   context.Informations.Add(info);
+   // -- (中略) --
+   var infoUpdate = new Information { id = 1, message = "台風です"};
+   context.Informations.Update(infoUpdate);
+   context.SaveChanges();
+} catch (Exception e) {
+   throw e;
+}
+return OK;
+```
+
+1. 正常終了：データ追加・更新  
+   データが追加されたのち、message が更新される。
+
+| id  | title  | message  |
+| --- | ------ | -------- |
+| 1   | 本日は | 台風です |
+
+2. 正常終了：データ追加・更新  
+   データが追加されたのち、更新される。  
+   message は更新されるが、title が指定されていないので、title が消える。
+
+| id  | title | message  |
+| --- | ----- | -------- |
+| 1   |       | 台風です |
+
+3. エラー：処理に失敗  
+   Update 処理がうまくできず、エラーになってしまう。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+<details>
+<summary>こたえ</summary>
+
+3. エラー：処理に失敗
+
+> DB に格納されていない状態で、Select しないで Update しようとするとエラーになる。
+
+</details>
+
+---
+
+### No.12 Select しないで Remove
+
+以下のコードを実行した結果、どうなるでしょうか？
+
+> [!NOTE]
+>
+> - データベース内にはデータが１件
+>
+>   | id  | title  | message  |
+>   | --- | ------ | -------- |
+>   | 1   | 本日は | 晴天なり |
+>
+> - 任意でトランザクション開始しない(お任せ自動コミットモード)
+
+```csharp
+DBContext context = GetDbContext();
+try {
+   var info = new Information { Id = 1 };
+   context.Informations.Remove(info);
+   context.SaveChanges();
+} catch (Exception e) {
+   throw e;
+}
+return OK;
+```
+
+1. エラー：削除されない  
+   更新対象を select していないので、削除に失敗する。
+
+| id  | title  | message  |
+| --- | ------ | -------- |
+| 1   | 本日は | 晴天なり |
+
+2. 正常終了：削除される  
+   データが削除される。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+<details>
+<summary>こたえ</summary>
+
+2. 正常終了：削除される
+
+> select していなくても削除は可能。
+
+</details>
+
+---
+
+### No.13 Select しないで Remove(対象データなし)
+
+以下のコードを実行した結果、どうなるでしょうか？
+
+> [!NOTE]
+>
+> - データベース内にはデータが存在しない
+> - 任意でトランザクション開始しない(お任せ自動コミットモード)
+
+```csharp
+DBContext context = GetDbContext();
+try {
+   var info = new Information { Id = 1 };
+   context.Informations.Remove(info);
+   context.SaveChanges();
+} catch (Exception e) {
+   throw e;
+}
+return OK;
+```
+
+1. 正常終了：なにもおこらない  
+   Delete が実行されるだけなので、エラーは起きない。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+2. エラー：削除対象がないエラー  
+   削除対象がないので、削除に失敗する。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+<details>
+<summary>こたえ</summary>
+
+2. エラー：削除対象がないエラー
+
+> 削除対象がない場合にはエラーになる。
+
+</details>
+
+---
+
+### No.14 削除 × ２
+
+以下のコードを実行した結果、どうなるでしょうか？
+
+> [!NOTE]
+>
+> - データベース内にはデータが１件
+>
+>   | id  | title  | message  |
+>   | --- | ------ | -------- |
+>   | 1   | 本日は | 晴天なり |
+>
+> - 任意でトランザクション開始しない(お任せ自動コミットモード)
+
+```csharp
+DBContext context = GetDbContext();
+try {
+   var info = context.Informations.Find(1);
+   context.Informations.Remove(info);
+   // -- (中略) --
+   context.Informations.Remove(info); // 大事なことなので２回実行する
+   context.SaveChanges();
+} catch (Exception e) {
+   throw e;
+}
+return OK;
+```
+
+1. 正常終了：データは削除される  
+   1 回目で削除され、2 回目はデータがないのでスルーされる。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+2. エラー：削除対象がないエラー  
+   2 回目の削除でエラーになる。  
+   1 回目の削除後にコミットされているので、データは消えている。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+3. エラー：削除対象がないエラー(ロールバック)  
+   2 回目の削除でエラーになる。  
+   1 回目の処理もロールバックされる。
+
+| id  | title  | message  |
+| --- | ------ | -------- |
+| 1   | 本日は | 晴天なり |
+
+<details>
+<summary>こたえ</summary>
+
+1. 正常終了：データは削除される
+
+> 2 回呼んでもエラーにはならない。
+
+</details>
+
+---
