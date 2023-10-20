@@ -941,3 +941,63 @@ return OK;
 </details>
 
 ---
+
+### No.17 削除した後アップデート
+
+以下のコードを実行した結果、どうなるでしょうか？
+
+> [!NOTE]
+>
+> - データベース内にはデータが１件
+>
+>   | id  | title  | message  |
+>   | --- | ------ | -------- |
+>   | 1   | 本日は | 晴天なり |
+>
+> - 任意でトランザクション開始しない(お任せ自動コミットモード)
+
+```csharp
+DBContext context = GetDbContext();
+try {
+   var info = context.Informations.Find(1);
+   context.Informations.Remove(info);
+   // -- (中略) --
+   info.title = "明日は";
+   context.Informations.Update(info);
+   context.SaveChanges();
+} catch (Exception e) {
+   throw e;
+}
+return OK;
+```
+
+1. 正常終了：データは削除される  
+   1 回目で削除され、2 回目はデータがないのでスルーされる。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+2. エラー：更新対象がないエラー  
+   Remove で削除後にコミットされているので、データは消えている。
+   Update はデータがないのでエラーになる。
+
+| id  | title | message |
+| --- | ----- | ------- |
+
+3. 正常終了：データは更新される  
+   Remove は無視され、Update だけが実施される。
+
+| id  | title  | message  |
+| --- | ------ | -------- |
+| 1   | 明日は | 晴天なり |
+
+<details>
+<summary>こたえ</summary>
+
+3. 正常終了：データは更新される
+
+> 更新が優先され、削除されない。
+
+</details>
+
+---
